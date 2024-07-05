@@ -1,0 +1,4 @@
+terraform/terraform.tfstate*
+terraform_modify_to_sprut_state.sh
+state_modification_table.txt
+terraform/.terraform*
