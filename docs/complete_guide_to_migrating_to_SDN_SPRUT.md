@@ -1,4 +1,4 @@
-﻿Полное руководство по миграции на SDN SPRUT
+﻿<a name="_page16_x0.00_y249.64"></a>Полное руководство по миграции на SDN SPRUT
 
 В данном руководстве описаны причины и премущества миграции с SDN Neutron, на SDN Sprut. Приведены лучшие практики, типовые кейсы и способы миграции сервисов VK CLOUD.
 
@@ -165,25 +165,25 @@ IaaS
 - Между стандартным и продвинутым маршрутизатором мы строим транзитную сеть. Для каждого стандартного маршрутизатора нужна отдельная транзитная сеть.
 - Необходимо прописать соответствующие статические маршруты на стандартных и продвинутых маршрутизаторах.
 
-# Балансировщики
+## Балансировщики
 
 - Сервис одинаков для neutron и sprut, но для миграции его необходимо пересоздать, так как у балансировщика нельзя заменить сеть.
 - Можно пересоздать в terraform, указав сеть sprut в описании манифеста и подключить виртуальные машины уже после их миграции.
 - Можно создать балансировщик вручную и указать вм в правилах.
 - В разработке скрипт для создания копии балансировщика и с назначением всех виртуальных машин.
 
-Публичный DNS
+## Публичный DNS
 
 - В связи со сменой плавающих ip необходимо отредактировать текущие A-записи.
 - Если используется внешний сервис dns, изменить записи в нём.
 
-<a name="_page8_x0.00_y254.85"></a>Виртуальные машины
+# Виртуальные машины
 
-<a name="_page8_x0.00_y279.68"></a>общая схема
+## Общая схема
 
 Для миграции виртуальных машин используется скрипт migrator-multiple.sh, который работает по следующему алгоритму:
 
-![](Aspose.Words.ab5b0b3d-65d0-4b47-9be1-07d1d46ec625.012.jpeg)
+<img src="./images/Aspose.Words.ab5b0b3d-65d0-4b47-9be1-07d1d46ec625.012.jpeg" width="600" height="400">
 
 Сценарий предполагает выполнение последовательности действий, которая позволит переключить сетевой интерфейс ВМ в новый SDN. При этом важно помнить, что данная операция выполняется с разрывом сетевой связности.
 
@@ -201,7 +201,7 @@ IaaS
 
 Зелёный - один сетевой интерфейс в серой сети без плавающего ip.
 
-<a name="_page9_x0.00_y175.50"></a>Подготовительные шаги.
+## Подготовительные шаги.
 
 1. В проекте VK Cloud создана ВМ с подключением к виртуальной сети, принадлежащей SDN Neutron.
 1. В проекте VK Cloud создана новая сеть в SDN Sprut c подсетью, настройки которой повторяют настройки подсети, созданной в сети Neutron.
@@ -211,475 +211,39 @@ IaaS
 1. Выполнена проверка о наличии аналогичных нейтроновским секьюрити групп на спруте. Их имя должно иметь постфикс -sprut (исключение базовые группы создаваемые по умолчанию вроде: default,all).
 
    Скрипт:
+   [check-if-all-sprut-sg-present.sh](../check-if-all-sprut-sg-present.sh)
 
-`      `#!/bin/bash![](Aspose.Words.ab5b0b3d-65d0-4b47-9be1-07d1d46ec625.013.png)
-
-echo " #######################################
-
-- #
-- Security Group Check Script    #
-- # #######################################
-
-This script checks all VMs in the tenant, collects the names of the assigned security groups, and verifies if there are corresponding security groups with the '-sprut' postfix.
-
-It will skip checking for security groups named 'default', 'ssh+www', and 'all'. "
-
-- Function to get a list of all VMs in the tenant function get\_all\_vms {
-
-  `    `openstack server list -f value -c Name
-
-  }
-
-- Function to get the security groups assigned to a VM
-
-function get\_vm\_security\_groups {
-
-`    `local vm\_name=$1
-
-`    `openstack server show "$vm\_name" -f json | jq -r '.security\_groups[] | .name' }
-
-- Function to check if a security group with a given name and '-sprut' postfix exists function check\_sprut\_sg\_exists {
-
-  `    `local sg\_name=$1
-
-  `    `openstack security group list -f value -c Name | grep -qw "${sg\_name}-sprut"
-
-  }
-
-- Main script execution all\_vms=$(get\_all\_vms) sg\_names=()
-
-  for vm in $all\_vms; do
-
-  `    `echo "Checking VM: $vm"
-
-  `    `vm\_sg\_names=$(get\_vm\_security\_groups "$vm")
-
-  `    `echo "Security groups found on VM $vm: $vm\_sg\_names"     for sg\_name in $vm\_sg\_names; do
-
-  `        `sg\_names+=("$sg\_name")
-
-  `    `done done![](Aspose.Words.ab5b0b3d-65d0-4b47-9be1-07d1d46ec625.014.png)
-
-- Remove duplicates and sort the list
-
-unique\_sg\_names=($(echo "${sg\_names[@]}" | tr ' ' '\n' | sort -u | tr '\n' ' '))
-
-- Filter out the security groups that should not be checked
-
-filtered\_sg\_names=()
-
-for sg\_name in "${unique\_sg\_names[@]}"; do
-
-`    `if [[ "$sg\_name" != "default" && "$sg\_name" != "ssh+www" && "$sg\_name" != "all" ]]; then         filtered\_sg\_names+=("$sg\_name")
-
-`    `fi
-
-done
-
-- Check for corresponding '-sprut' security groups and report missing ones missing\_sg=()
-
-  for sg\_name in "${filtered\_sg\_names[@]}"; do
-
-  `    `echo "Checking for corresponding '-sprut' security group for: $sg\_name"     if check\_sprut\_sg\_exists "$sg\_name"; then
-
-  `        `echo "Found corresponding '-sprut' group for: $sg\_name"
-
-  `    `else
-
-  `        `echo "Missing corresponding '-sprut' group for: $sg\_name"
-
-  `        `missing\_sg+=("$sg\_name")
-
-  `    `fi
-
-  done
-
-  echo "------------------------------------"
-
-  echo "Security Group Check Summary"
-
-  echo "------------------------------------"
-
-  if [ ${#missing\_sg[@]} -eq 0 ]; then
-
-  `    `echo "All security groups have corresponding '-sprut' groups."
-
-  else
-
-  `    `echo "The following security groups do not have corresponding '-sprut' groups:"     for sg in "${missing\_sg[@]}"; do
-
-  `        `echo "- $sg"
-
-  `    `done
-
-  fi
-
-  echo "------------------------------------"
 
 7. Запустить скрипт миграции:
 
 Для запуска скрипта:
 
-./migrator-multiple.sh --all-secgroup-sprut-id=<id  all  >  <csv     >![](Aspose.Words.ab5b0b3d-65d0-4b47-9be1-07d1d46ec625.015.png)
-
+```bash
+./migrator-multiple.sh --all-secgroup-sprut-id=<id группы all на спруте>  <csv файл с описанием мигрируемых ВМ>
+```
 --all-secgroup-sprut-id - так как в проекте будет 2 группы all для neutron и sprut, необходимо указать id в sprut, так как openstack cli неспособен различить принадлежность секьюрити группы к sdn.
 
 csv файл с описанием мигрируемых вм имеет следующий формат:
 
 имя вм1,имя сети sprut,имя подсети sprut,<опционально: id плавающего ip на спрут, который назначится> имя вм2,имя сети sprut,имя подсети sprut
 
-Код скрипта:
+[migrator.sh](../migrator.sh)
 
-`    `#!/bin/bash![](Aspose.Words.ab5b0b3d-65d0-4b47-9be1-07d1d46ec625.016.png)
+После миграции может возникнуть необходимость перезагрузить dhclient на вм
 
-echo " #######################################
+Для Windows:
+```bash
 
-- #
-- Port Migration Script        #
-- #
+ipconfig /release
+ipconfig /renew 
+```
 
-####################################### Mandatory Input Data:![ref2]
+Для Lunix:
+```bash
+dhclient
+```
 
-Input file format: server\_name1,dest\_net1,dest\_subnet1,floating\_ip\_id1 server\_name2,dest\_net2,dest\_subnet2,floating\_ip\_id2
-
-Note: If floating\_ip\_id is not provided, the script will not attach a Floating IP.
-
-Optional: --all-secgroup-sprut-id=<id> --ssh-www-secgroup-sprut-id=<id>
-
-"
-
-- Parse arguments
-
-for i in "$@"
-
-do
-
-case $i in
-
-`    `--all-secgroup-sprut-id=\*)
-
-`    `all\_sg\_sprut\_id="${i#\*=}"
-
-`    `shift
-
-`    `;;
-
-`    `--ssh-www-secgroup-sprut-id=\*)     ssh\_www\_sg\_sprut\_id="${i#\*=}"     shift
-
-`    `;;
-
-`    `\*)
-
-- unknown option
-
-`    `;;
-
-esac
-
-done
-
-- Function Definitions
-- Capture port information with full details
-
-function capture\_info\_full {
-
-`    `echo "Executing step 1: Capturing port information"
-
-- Define the migrated port name format
-
-`    `migrated\_port\_name="${sname}\_migrated\_port"
-
-- Check if the migrated port already exists and is attached to the server
-
-`    `existing\_migrated\_port\_info=$(openstack port list -f value -c ID -c Name | grep "$migrated\_port\_name")     existing\_migrated\_port\_id=$(echo "$existing\_migrated\_port\_info" | awk '{print $1}' | head -n 1)
-
-`    `if [ ! -z "$existing\_migrated\_port\_id" ]; then
-
-- Check if this port is already attached to the server
-
-`        `echo "Migrated port ${migrated\_port\_name} exists, checking for attachment..."
-
-`        `attached\_port\_info=$(openstack server port list $sname -f value -c ID | grep "$existing\_migrated\_port\_id")
-
-`        `if [ ! -z "$attached\_port\_info" ]; then
-
-`            `echo "Migrated port $migrated\_port\_name already exists and is attached to server $sname. Skipping..."
-
-`            `echo "\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*"
-
-`            `return 1 # Use return code 1 to indicate skipping
-
-`        `fi
-
-`    `fi
-
-- Proceed with capturing port information if no migrated port is attached
-
-`    `port\_output=$(openstack port list --server $sname -c id -c "MAC Address" -c "Fixed IP Addresses")     srcpid=$(echo "$port\_output" | awk -F'|' 'NR==4{print $2}' | sed 's/ //g')
-
-`    `mcs=$(echo "$port\_output" | awk -F'|' 'NR==4{print $3}' | sed 's/ //g')
-
-`    `ips=$(echo "$port\_output" | awk -F'|' 'NR==4{print $4}' | grep -oP "ip\_address='\K[^']+")
-
-`    `echo "Source Port ID is:        $srcpid"
-
-`    `echo "Source Port IP Addr is:   $ips"
-
-`    `echo "Source Port MAC Addr is:  $mcs"
-
-`    `echo "\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*" }
-
-- Capture server ID and security group names![ref2]
-
-function capture\_id\_and\_sec\_group {
-
-`    `echo "Executing step 2: Capturing server ID and security group names"
-
-`    `server\_output=$(openstack server show $sname)
-
-`    `servid=$(echo "$server\_output" | awk -F'|' '/\| id / {print $3}' | sed 's/ //g')     echo "Server ID is:             $servid"
-
-- Fetch security group IDs
-
-`    `sec\_group\_ids=$(openstack port show $srcpid -c security\_group\_ids -f value)
-
-- Preprocess to remove brackets and split by comma
-
-`    `sec\_group\_ids=$(echo $sec\_group\_ids | tr -d '[]' | tr -d '"' | tr -d "'")
-
-- Convert to array and iterate
-
-`    `IFS=',' read -ra ADDR <<< "$sec\_group\_ids"
-
-`    `sec\_group\_names=()
-
-`    `for sec\_group\_id in "${ADDR[@]}"; do
-
-`        `sec\_group\_name=$(openstack security group show $sec\_group\_id -c name -f value)         sec\_group\_names+=("$sec\_group\_name")
-
-`    `done
-
-`    `echo "Security Groups captured: ${sec\_group\_names[@]}"
-
-`    `echo "\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*"
-
-}
-
-- Create port in target network with source IP and MAC, with checks for existing port by name using grep function create\_port\_with\_mac\_ip {
-
-  `    `echo "Executing step 3: Creating port with source IP and MAC"
-
-- Define the port name format
-
-`    `port\_name="${sname}\_migrated\_port"
-
-- Attempt to find an existing port by name using grep
-
-`    `existing\_port\_info=$(openstack port list -f value -c ID -c Name | grep "$port\_name")     existing\_port\_id=$(echo "$existing\_port\_info" | awk '{print $1}' | head -n 1)
-
-`    `if [ ! -z "$existing\_port\_id" ]; then
-
-`        `echo "Port named $port\_name already exists. Port ID: $existing\_port\_id"
-
-`        `pmigid=$existing\_port\_id
-
-`    `else
-
-- If no existing port found, attempt to create a new port
-
-`        `create\_port\_cmd="openstack port create --network $defnet --fixed-ip subnet=$defsubnet,ip-address=$ips -- mac-address=$mcs $port\_name"
-
-`        `echo "Running command: $create\_port\_cmd"
-
-`        `new\_port\_output=$($create\_port\_cmd)
-
-`        `pmigid=$(echo "$new\_port\_output" | awk -F'|' '/\| id / {print $3}' | sed 's/ //g')
-
-`        `echo "Step 3 complete (New Port Created)"
-
-`    `fi
-
-`    `echo "\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*"
-
-}
-
-- Disconnect existing port from server
-
-function detach\_source\_port {
-
-`    `echo "Executing step 4: Disconnecting existing port from server"
-
-`    `detach\_port\_cmd="openstack server remove port $servid $srcpid"
-
-`    `echo "Running command: $detach\_port\_cmd"
-
-`    `$detach\_port\_cmd
-
-`    `echo "Step 4 complete (Source port disconnected from server $sname)"     echo "\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*"
-
-}
-
-- Connect new port to server
-
-function attach\_new\_port {
-
-`    `echo "Executing step 5: Connecting new port to server"
-
-`    `attach\_port\_cmd="openstack server add port $servid $pmigid"     echo "Running command: $attach\_port\_cmd"
-
-`    `$attach\_port\_cmd
-
-`    `echo "Step 5 complete (New port attached to server)"
-
-`    `echo "\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*" }![ref2]
-
-- Set security groups on the new port
-
-function set\_security\_groups {
-
-`    `echo "Executing step 6: Setting security groups on new port"     echo "Setting captured groups: ${sec\_group\_names[@]}"
-
-`    `for sec\_group\_name in "${sec\_group\_names[@]}"; do
-
-`        `echo "Original Security Group: $sec\_group\_name"
-
-`        `if [[ "$sec\_group\_name" == "all" ]]; then
-
-`            `modified\_sec\_group\_id="$all\_sg\_sprut\_id"
-
-`        `elif [[ "$sec\_group\_name" == "default" ]]; then
-
-`            `modified\_sec\_group\_name="default-sprut"
-
-`            `if openstack security group show "$modified\_sec\_group\_name" -c id -f value &> /dev/null; then
-
-`                `modified\_sec\_group\_id=$(openstack security group show "$modified\_sec\_group\_name" -c id -f value)             else
-
-`                `echo "Security Group $modified\_sec\_group\_name does not exist, skipping..."
-
-`                `continue
-
-`            `fi
-
-`        `elif [[ "$sec\_group\_name" == "ssh+www" ]]; then
-
-`            `modified\_sec\_group\_id="$ssh\_www\_sg\_sprut\_id"
-
-`        `else
-
-`            `modified\_sec\_group\_name="${sec\_group\_name}-sprut"
-
-- Check if modified security group exists before setting it
-
-`            `if openstack security group show "$modified\_sec\_group\_name" -c id -f value &> /dev/null; then
-
-`                `modified\_sec\_group\_id=$(openstack security group show "$modified\_sec\_group\_name" -c id -f value)             else
-
-`                `echo "Security Group $modified\_sec\_group\_name does not exist, skipping..."
-
-`                `continue
-
-`            `fi
-
-`        `fi
-
-`        `echo "Modified Security Group ID: $modified\_sec\_group\_id"
-
-`        `set\_sg\_cmd="openstack port set --security-group $modified\_sec\_group\_id $pmigid"
-
-`        `echo "Running command: $set\_sg\_cmd"
-
-`        `$set\_sg\_cmd
-
-`        `echo "Security Group $sec\_group\_name set on new port"
-
-`    `done
-
-`    `echo "Step 6 complete (Security groups assignment complete)"
-
-`    `echo "\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*"
-
-}
-
-- Attach Floating IP to the new port if provided function attach\_floating\_ip {
-
-  `    `if [ ! -z "$floating\_ip\_id" ]; then
-
-  `        `echo "Executing step 7: Attaching Floating IP"
-
-  `        `attach\_fip\_cmd="openstack floating ip set --port $pmigid $floating\_ip\_id"         echo "Running command: $attach\_fip\_cmd"
-
-  `        `$attach\_fip\_cmd
-
-  `        `echo "Floating IP $floating\_ip\_id attached to new port"
-
-  `        `echo "\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*"
-
-  `    `fi
-
-  }
-
-- Process migration for each server function process\_migration {
-
-  `    `sname=$1
-
-  `    `defnet=$2
-
-  `    `defsubnet=$3
-
-  `    `floating\_ip\_id=$4
-
-  `    `echo "Processing migration for server: $sname"     capture\_info\_full
-
-  `    `if [ $? -eq 1 ]; then
-
-- Skipping logic, e.g., continue in a loop
-
-`        `continue
-
-`    `fi
-
-`    `capture\_id\_and\_sec\_group
-
-`    `create\_port\_with\_mac\_ip
-
-`    `detach\_source\_port
-
-`    `attach\_new\_port![](Aspose.Words.ab5b0b3d-65d0-4b47-9be1-07d1d46ec625.018.png)
-
-`    `set\_security\_groups
-
-`    `attach\_floating\_ip
-
-`    `echo "Migration completed for server: $sname"     echo "---------------------------------------" }
-
-- Main script execution
-
-if [ -z "$1" ]; then
-
-`    `echo "Error: No input file provided."     exit 1
-
-fi
-
-start\_time=$(date +%s)
-
-while IFS=, read -r server\_name dest\_net dest\_subnet floating\_ip\_id
-
-do
-
-`    `process\_migration "$server\_name" "$dest\_net" "$dest\_subnet" "$floating\_ip\_id" done < "$1"
-
-end\_time=$(date +%s) elapsed\_time=$(($end\_time - $start\_time)) echo "Elapsed time: $elapsed\_time seconds"
-
-После миграции может возникнуть необходимость перезагрузить dhclient на вм Для Windows:
-
-\```
-
-ipconfig /release ipconfig /renew ```
-
-Для Lunix: ```bash dhclient ```
-
-<a name="_page14_x0.00_y459.86"></a>terraform
+## terraform
 
 Как было сказано ранее, можно мигрировать вм на другой sdn при помощи terraform, что требует пересоздания вм. Миграция через скрипт, описанный выше также приведёт к пересозданию вм, если выполнить terraform apply. 
 
@@ -687,110 +251,18 @@ ipconfig /release ipconfig /renew ```
 
 Вм может быть много и менять стейт вручную неудобно, следующий скрипт позволяет собрать информацию о вм, которые были мигрированы и подготовить новый скрипт, правящий состояние terraform:
 
-`    `#!/bin/bash![](Aspose.Words.ab5b0b3d-65d0-4b47-9be1-07d1d46ec625.019.png)
-
-echo " #######################################
-
-- #
-- Terraform State Modification Script#
-- # ####################################### "
-- ,      
-
-if [[ -n "$1" ]]; then
-
-`    `state\_file="-state=$1"
-
-`    `echo "Using specified state file: $1" else
-
-`    `state\_file=""
-
-`    `echo "Using default state file"
-
-fi![](Aspose.Words.ab5b0b3d-65d0-4b47-9be1-07d1d46ec625.020.png)
-
-- Terraform
-
-terraform\_state\_list=$(terraform state list $state\_file)
-
-- ,    vkcs\_compute\_instance
-
-compute\_instances=$(echo "$terraform\_state\_list" | grep "vkcs\_compute\_instance")
-
-- compute\_instances
-
-if [[ -z "$compute\_instances" ]]; then
-
-`    `echo "No vkcs\_compute\_instance resources found in the current Terraform state."     exit 1
-
-fi
-
- 
-
-output\_script="terraform\_modify\_to\_sprut\_state.sh"
-
-echo "#!/bin/bash" > $output\_script
-
-echo "echo '#######################################'" >> $output\_script echo "echo '#                                     #'" >> $output\_script echo "echo '#  Modifying Terraform State Script   #'" >> $output\_script echo "echo '#                                     #'" >> $output\_script echo "echo '#######################################'" >> $output\_script
-
- 
-
-table\_output="terraform resource name | openstack vm id | vm name\n"
-
-- compute\_instance       
-
-while IFS= read -r instance; do
-
-- id   
-
-`    `resource\_info=$(terraform state show $state\_file $instance)
-
-`    `resource\_id=$(echo "$resource\_info" | grep -E '^\s\*id\s\*=' | awk -F' = ' '{print $2}' | tr -d '"' | head -n 1)
-
-`    `resource\_name=$(echo "$resource\_info" | grep -E '^\s\*name\s\*=' | awk -F' = ' '{print $2}' | tr -d '"' | head -n 1)
-
-- id   
-
-`    `if [[ -z "$resource\_id" || -z "$resource\_name" ]]; then
-
-`        `echo "No id or name found for $instance in the current Terraform state."         continue
-
-`    `fi
-
- 
-
-`    `echo "echo 'Modifying $instance'" >> $output\_script
-
-`    `echo "terraform state rm $instance $state\_file" >> $output\_script
-
-`    `echo "terraform import $instance $resource\_id $state\_file" >> $output\_script
-
- 
-
-`    `table\_output+="$instance | $resource\_id | $resource\_name\n" done <<< "$compute\_instances"
-
- 
-
-chmod +x $output\_script
-
- 
-
-echo -e "Generated script: $output\_script\n" echo -e "$table\_output"
-
-- ` `table\_output\_file="state\_modification\_table.txt" echo -e "$table\_output" > $table\_output\_file
-
-  echo "Table of resources saved to $table\_output\_file"
-
+[modify_terraform_state.sh](../modify_terraform_state.sh)
 Для запуска:
 
-![](Aspose.Words.ab5b0b3d-65d0-4b47-9be1-07d1d46ec625.021.png)
-
-`    `modify\_terraform\_state.sh <  >![](Aspose.Words.ab5b0b3d-65d0-4b47-9be1-07d1d46ec625.022.png)
+```bash
+modify_terraform_state.sh <стейт файл терраформа>
+```
 
 Если не указать в параметрах стейт файл терраформа, будет использоваться текущий файл terraform.tfstate Необходимо в коде терраформе также указать новые сети у вм.
 
-<a name="_page16_x0.00_y129.53"></a>NFS/CIFS
+## NFS/CIFS
 
-<a name="_page16_x0.00_y154.35"></a>общая схема
+### Общая схема
 
 Файловое хранилище поддерживает бэкапы, однако их нельзя поднять в сети другого sdn. Необходимо:
 
@@ -798,19 +270,19 @@ echo -e "Generated script: $output\_script\n" echo -e "$table\_output"
 1. Создать вм 1-2 и подключить её к сетям старого и нового хранилищь.
 1. Выполнить подключение на вм к обоим хранилищам и запустить rsync и перелить данные в новое хранилище. 
 
-<a name="_page16_x0.00_y249.64"></a>PaaS
+### PaaS
 
 Общая схема миграции подразумевает создание копии PaaS в сети neutron и переноса нагрузки при помощи встроенных средств бэкапирования. Для простоты решения рекомендуется остановить кластеры на запись, пока выполняется перенос.
 
-![](Aspose.Words.ab5b0b3d-65d0-4b47-9be1-07d1d46ec625.023.jpeg)
+<img src="./images/Aspose.Words.ab5b0b3d-65d0-4b47-9be1-07d1d46ec625.023.jpeg" width="600" height="400">
 
-![](Aspose.Words.ab5b0b3d-65d0-4b47-9be1-07d1d46ec625.024.jpeg)
+<img src="./images/Aspose.Words.ab5b0b3d-65d0-4b47-9be1-07d1d46ec625.024.jpeg" width="600" height="400">
 
 В данной схеме можно использовать продвинутый роутер в качестве связности neutron и sprut.
 
-<a name="_page17_x0.00_y232.09"></a>Kubernetes
+## Kubernetes
 
-<a name="_page17_x0.00_y256.91"></a>общая схема
+### Общая схема
 
 1. Создаём аналогичный кластер в новой сети sprut. В случае если в сети помимо кластера kubernetes есть другие сервисы или виртуалки, адрес сети на sprut, где размещён kubernetes должен отличаться от исходного.
 1. Переносим нагрузку при помощи средства бэкапирования velero, в том числе pv. Примеры использования velero находятся в инструкции: <https://github.com/IlyaNyrkov/k8s-velero-vkcloud-workshop>
@@ -819,7 +291,7 @@ echo -e "Generated script: $output\_script\n" echo -e "$table\_output"
 1. Проверяем функционирование приложения.
 1. Удаляем старый кластер.
 
-<a name="_page17_x0.00_y381.75"></a>DbaaS
+## DbaaS
 
 1. Останавливаем исходную базу данных на запись и делаем снапшот. Альтернативно можно использовать pgdump и другие встроенные средства бэкапирования баз данных.
 1. Из бэкапа поднимаем базу данных в новой сети.
@@ -827,5 +299,3 @@ echo -e "Generated script: $output\_script\n" echo -e "$table\_output"
 1. Правим конфиги вм, чтобы они ходили в бд с новым адресом.
 1. Удаляем исходную бд.
 
-[ref1]: Aspose.Words.ab5b0b3d-65d0-4b47-9be1-07d1d46ec625.003.png
-[ref2]: Aspose.Words.ab5b0b3d-65d0-4b47-9be1-07d1d46ec625.017.png
