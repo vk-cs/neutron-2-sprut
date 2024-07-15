@@ -8,7 +8,7 @@
 
 ## Скрипт для миграции одного порта виртуальной машины между SDN.
 
-[migrator.sh](../blob/master/migrator.sh)
+[migrator.sh](../migrator.sh)
 
 #### Подготовительные действия.
 
