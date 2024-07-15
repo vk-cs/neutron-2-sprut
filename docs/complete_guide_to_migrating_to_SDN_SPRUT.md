@@ -79,23 +79,23 @@ Software Defined Network — концепция выведения сетевы�
 1. Какие платформенные сервисы используются в облачном проекте?
 1. Используется ли файловое хранилище nfs/cifs?
 
-<a name="_page1_x0.00_y721.20"></a>Ограничения, к которым нужно быть готовым
+# Ограничения, к которым нужно быть готовым
 
 Миграция с neutron на sprut процесс, требующий дополнительные действия с точки зрения сетевой инфраструктуры. 
 
-<a name="_page2_x0.00_y81.64"></a>Смена плавающих ip
+## Смена плавающих ip
 
-<a name="_page2_x0.00_y110.03"></a>Описание
+## Описание
 
 Для предоставления белых ip адресов (плавающих, либо получаемых при прямом подключении) в SDN NEUTRON используется сеть ext-net, в которой имеются подсети с диапазоном белых ip адресов. 
 
 Для SDN SPRUT используется такая же сеть, но с названием internet и с другим диапазоном адресов подстей.
 
-<a name="_page2_x0.00_y175.46"></a>Решение
+Решение
 
 В ходе миграции нужно учитывать замену белых ip. Белые плавающие ip можно создать заранее и передать сторонним организациям (если такие есть), чтобы они заранее ввели новые ip в белые списки
 
-<a name="_page2_x0.00_y236.66"></a>Как мигрировать
+Как мигрировать
 
 Процесс миграции может быть выполнен различными инструментами, в зависимости от сервиса и времени техокна (время когда сервис не будет работать).
 
@@ -103,11 +103,11 @@ Software Defined Network — концепция выведения сетевы�
 
 Другие способы, требующие меньшего техокна, будут описаны ниже.
 
-<a name="_page2_x0.00_y348.52"></a>IaaS
+IaaS
 
-<a name="_page2_x0.00_y376.91"></a>Сети
+Сети
 
-<a name="_page2_x0.00_y401.74"></a>общая схема
+общая схема
 
 В начале необходимо создать на sprut аналогичные базовые сетевые сущности, которые были на netron:
 
@@ -118,321 +118,7 @@ Software Defined Network — концепция выведения сетевы�
 
 3. Секьюрити группы. Можно создать и скопировать правила при помощи скрипта
 
-`      `#!/bin/bash![](Aspose.Words.ab5b0b3d-65d0-4b47-9be1-07d1d46ec625.002.png)
-
-- Function to display help message
-
-display\_help() {
-
-`    `echo "Usage: $0 --group-mapping=neutron\_id1=sprut\_id1,neutron\_id2=sprut\_id2,... --groups=group\_name1, group\_name2,..."
-
-`    `echo
-
-`    `echo "Options:"
-
-`    `echo "  --group-mapping    Specifies the mapping of Neutron security group IDs to Sprut security group IDs."
-
-`    `echo "  --groups           Specifies the names of security groups to be copied from Neutron to Sprut."
-
-`    `echo
-
-`    `echo "Example:"
-
-`    `echo "  $0 --group-mapping=e70baf6b=5a60883e-c165-4f2d-9477-4c417acd5d6f,4b345b50-df8b-4e21-8fd5- 29c90c6d4918=8492ee54-a0a6-4dd1-a8af-0c73d4b5edf5 --groups=test-neutron-sg"
-
-`    `echo
-
-`    `echo "This script copies security group rules from the source Neutron environment to the target Sprut environment."
-
-}
-
-if ! command -v jq &> /dev/null; then
-
-`    `echo "Error: jq is not installed."
-
-`    `echo "jq is a lightweight and flexible command-line JSON processor."
-
-`    `echo "You can install jq using the following commands:"     echo "For Ubuntu/Debian:"![ref1]
-
-`    `echo "  sudo apt-get update"
-
-`    `echo "  sudo apt-get install -y jq"
-
-`    `echo "For CentOS/RHEL:"
-
-`    `echo "  sudo yum install -y epel-release"
-
-`    `echo "  sudo yum install -y jq"
-
-`    `echo "For macOS using Homebrew:"
-
-`    `echo "  brew install jq"
-
-`    `exit 1
-
-fi
-
-- Function to get the authentication token get\_auth\_token() {
-
-  `    `local token=$(openstack token issue -c id -f value)     echo "$token"
-
-  }
-
-- Function to check if a security group exists and get its ID
-
-get\_sg\_id() {
-
-`    `local sg\_name="$1"
-
-`    `local sg\_id=$(openstack security group show "$sg\_name" -f value -c id 2>/dev/null)     echo "$sg\_id"
-
-}
-
-- Function to create security group with '-sprut' postfix create\_sg() {
-
-  `    `local sg\_name="$1"
-
-  `    `local new\_sg\_name="${sg\_name}-sprut"
-
-  `    `local token="$2"
-
-  `    `local url="https://infra.mail.ru:9696/infra/network/v2.0/security-groups"
-
-  `    `local data=$(cat <<EOF
-
-  {
-
-  `    `"backend" : "sprut",
-
-  `    `"security\_group": {
-
-  `        `"name": "$new\_sg\_name",
-
-  `        `"description": "Copy of $sg\_name"     }
-
-  }
-
-  EOF
-
-  `    `)
-
-  `    `curl -s -X POST $url \
-
-  `        `-H "Content-Type: application/json" \         -H "X-Auth-Token: $token" \
-
-  `        `-H "X-SDN: SPRUT" \
-
-  `        `-d "$data"
-
-  }
-
-- Function to remove the default egress rule remove\_default\_egress\_rule() {
-
-  `    `local sg\_id="$1"
-
-- Get the rule ID of the default egress rule
-
-`    `local rule\_ids=$(openstack security group rule list "$sg\_id" -f json | jq -r '.[] | select(. Direction == "egress" and ."IP Range" == "0.0.0.0/0" and ."Port Range" == "") | .ID')
-
-- Remove the default egress rule
-
-`    `for id in $rule\_ids; do
-
-`        `openstack security group rule delete "$id"     done
-
-}
-
-- Function to copy security group rules from one group to another copy\_sg\_rules() {
-
-  `    `local src\_sg="$1"
-
-  `    `local dest\_sg="$2"
-
-  `    `local -n mapping=$3
-
-- Get the rule IDs of the source security group![ref1]
-
-`    `local rules\_json=$(openstack security group show "$src\_sg" -f json | jq '.rules')
-
-- Iterate over each rule to fetch full details
-
-`    `for rule in $(echo "${rules\_json}" | jq -r '.[] | @base64'); do         \_jq() {
-
-`            `echo "${rule}" | base64 --decode | jq -r "${1}"
-
-`        `}
-
-`        `local direction=$(\_jq '.direction')
-
-`        `local protocol=$(\_jq '.protocol')
-
-`        `local port\_range\_min=$(\_jq '.port\_range\_min')         local port\_range\_max=$(\_jq '.port\_range\_max')         local ip\_range=$(\_jq '.remote\_ip\_prefix')
-
-`        `local ethertype=$(\_jq '.ethertype')
-
-`        `local description=$(\_jq '.description')
-
-`        `local remote\_sg=$(\_jq '.remote\_group\_id')
-
-- Check for specific group names and get corresponding IDs
-
-`        `if [[ "$remote\_sg" != "null" ]]; then
-
-`            `local old\_remote\_sg="$remote\_sg"
-
-`            `remote\_sg=$(echo ${mapping[$remote\_sg]})
-
-`            `echo "Replacing Neutron SecurityGroup ID '$old\_remote\_sg' with Sprut SecurityGroup ID '$remote\_sg'"
-
-`        `fi
-
-- Construct command for creating rule
-
-`        `local cmd="openstack security group rule create $dest\_sg"
-
-`        `[ "$protocol" != "null" ] && cmd+=" --protocol $protocol"
-
-`        `[ "$port\_range\_min" != "null" ] && cmd+=" --dst-port $port\_range\_min:$port\_range\_max"
-
-`        `[ "$ip\_range" != "null" ] && [ "$remote\_sg" == "null" ] && cmd+=" --remote-ip $ip\_range"         [ "$direction" == "egress" ] && cmd+=" --egress"
-
-`        `[ "$direction" == "ingress" ] && cmd+=" --ingress"
-
-`        `[ "$ethertype" != "null" ] && cmd+=" --ethertype $ethertype"
-
-`        `[ "$description" != "null" ] && cmd+=" --description \"$description\""
-
-`        `[ "$remote\_sg" != "null" ] && cmd+=" --remote-group $remote\_sg"
-
-- Execute the command
-
-`        `echo "Executing: $cmd"
-
-`        `if $cmd; then
-
-`            `echo "Rule created successfully for $dest\_sg"         else
-
-`            `echo "Failed to create rule for $dest\_sg"
-
-`        `fi
-
-`    `done
-
-}
-
-- Get the authentication token echo "Getting auth token" token=$(get\_auth\_token)
-- Initialize statistics declare -A stats stats[success]=0 stats[fail]=0
-- Read command-line arguments
-
-  while [ $# -gt 0 ]; do
-
-  `    `case "$1" in
-
-  `        `--group-mapping=\*)
-
-  `            `group\_mapping="${1#\*=}"
-
-  `            `;;
-
-  `        `--groups=\*)
-
-  `            `groups="${1#\*=}"
-
-  `            `;;
-
-  `        `--help)
-
-  `            `display\_help
-
-  `            `exit 0
-
-  `            `;;
-
-  `        `\*)
-
-  `            `echo "Unknown parameter: $1"
-
-  `            `display\_help             exit 1![](Aspose.Words.ab5b0b3d-65d0-4b47-9be1-07d1d46ec625.004.png)
-
-  `            `;;
-
-  `    `esac
-
-  `    `shift
-
-  done
-
-- Check if group mapping is provided if [ -z "$group\_mapping" ]; then
-
-  `    `echo "No group-mapping provided." fi
-
-- Parse group mapping
-
-declare -A sg\_mapping
-
-if [ -n "$group\_mapping" ]; then
-
-`    `IFS=',' read -r -a mappings <<< "$group\_mapping"
-
-`    `for mapping in "${mappings[@]}"; do
-
-`        `IFS='=' read -r neutron\_id sprut\_id <<< "$mapping"         sg\_mapping["$neutron\_id"]="$sprut\_id"
-
-`    `done
-
-fi
-
-- Read each security group name from the command line arguments IFS=',' read -r -a sg\_names <<< "$groups"
-
-  for sg\_name in "${sg\_names[@]}"; do
-
-- Trim whitespace
-
-`    `sg\_name=$(echo "$sg\_name" | xargs)
-
-`    `echo "------------------------------------"     echo "Checking if group '$sg\_name' exists..."
-
-- Check if the security group exists
-
-`    `sg\_id=$(get\_sg\_id "$sg\_name")
-
-`    `if [ -z "$sg\_id" ]; then
-
-`        `echo "No SecurityGroup found for '$sg\_name'"         stats[fail]=$((stats[fail]+1))
-
-`        `continue
-
-`    `fi
-
-`    `new\_sg\_name="${sg\_name}-sprut"
-
-`    `echo "Checking if group '$new\_sg\_name' already exists..."
-
-- Check if the target security group with postfix exists
-
-`    `new\_sg\_id=$(get\_sg\_id "$new\_sg\_name")
-
-`    `if [ ! -z "$new\_sg\_id" ]; then
-
-`        `echo "SecurityGroup '$new\_sg\_name' already exists"         stats[fail]=$((stats[fail]+1))
-
-`        `continue
-
-`    `fi
-
-`    `echo "Creating new security group '$new\_sg\_name'..."     create\_sg "$sg\_name" "$token"
-
-`    `echo "Removing default egress rule from '$new\_sg\_name'..."     remove\_default\_egress\_rule "$new\_sg\_name"
-
-`    `echo "Copying rules from '$sg\_name' to '$new\_sg\_name'..."     copy\_sg\_rules "$sg\_id" "$new\_sg\_name" sg\_mapping
-
-`    `echo "Copying finished for '$sg\_name'"     stats[success]=$((stats[success]+1)) done
-
-echo "------------------------------------" echo "Processing complete."
-
-echo "Statistics:"
-
-echo "Successfully copied: ${stats[success]}" echo "Failed to copy: ${stats[fail]}"
+[copy-security-group.sh](../copy-security-group.sh)
 
 ./copy-security-group.sh --group-mapping=<id    1>=<id    1>,<id    2>=<id    2>,... \ --groups=<      1>,<      2>,...![](Aspose.Words.ab5b0b3d-65d0-4b47-9be1-07d1d46ec625.005.png)
 
