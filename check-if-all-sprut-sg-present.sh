@@ -49,7 +49,7 @@ unique_sg_names=($(echo "${sg_names[@]}" | tr ' ' '\n' | sort -u | tr '\n' ' '))
 # Filter out the security groups that should not be checked
 filtered_sg_names=()
 for sg_name in "${unique_sg_names[@]}"; do
-    if [[ "$sg_name" != "default" && "$sg_name" != "ssh+www" && "$sg_name" != "all" ]]; then
+    if [[ "$sg_name" != "default" && "$sg_name" != "ssh+www" && "$sg_name" != "all" && "$sg_name" != *"-sprut" ]]; then
         filtered_sg_names+=("$sg_name")
     fi
 done

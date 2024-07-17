@@ -231,7 +231,7 @@ fi
 
 start_time=$(date +%s)
 
-while IFS=, read -r server_name dest_net dest_subnet floating_ip_id
+while IFS=, read -r server_name dest_net dest_subnet floating_ip_id || [ -n "$server_name" ]
 do
     process_migration "$server_name" "$dest_net" "$dest_subnet" "$floating_ip_id"
 done < "$1"
