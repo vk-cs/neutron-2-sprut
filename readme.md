@@ -15,7 +15,14 @@
 ![](./docs/images/(IaaS)_алгоритм_миграции_нейтрон_спрут.png)
 
 0. Подготовить интеграционные/ручные или другие тесты, для проверки функционирования системы после миграции.
-1. Отправить в техподдержку запрос на добавление сети sprut в проект в облаке. В обращении необходимо указать айди проекта/проектов куда нужно добавить сеть sprut. [Контакты техподдержки](https://cloud.vk.com/docs/ru/intro/start/support/support-info).
+1. В проекте должен быть включен SDN Sprut, проверить это можно нажав на название проекта
+![](./docs/images/check_sprut_1.png)
+три точки -> настройка проекта → вкладка "Виртуальные сети". 
+![](./docs/images/check_sprut_2.png)
+![](./docs/images/check_sprut_3.png)
+
+Если SDN Sprut отсутсвует, то нужно oтправить в техподдержку запрос на добавление сети sprut в проект в облаке. В обращении необходимо указать айди проекта/проектов куда нужно добавить сеть sprut. [Контакты техподдержки](https://cloud.vk.com/docs/ru/intro/start/support/support-info).
+
 2. Подготовить рабочее место администратора (ВМ с ОС Linux) с установленными компонентами OpenStack CLI (nova, neutron, octavia), файл конфигурации отправлен в source [инструкция по установке](https://cloud.vk.com/docs/tools-for-using-services/cli/openstack-cli). Можно проверить работу через команду 
 ```bash
 openstack server list -c ID -c Name -c Networks
@@ -98,7 +105,20 @@ migration-target-default-group-0,vpn_net-sprut,vpn_subnet-sprut
 ```bash
 ./migrator-multiple.sh <название csv файла>
 ```
-Последовательно для каждой вм будет такой вывод:
+
+Если используются секьюрити группы ssh+www, all, для копирования их во время миграции необходимо указать флаги:
+
+```bash
+./migrator-multiple.sh <название csv файла> \
+ --all-secgroup-sprut-id=<id группы на спруте> \
+ --ssh-www-secgroup-sprut-id=<id группы на спруте>
+```
+
+ID можно посмотреть в графическом интерфейсе "Виртуальные сети" -> "Настройки firewall" и посмотреть аналогичные группы с тегом "Sprut".
+
+![](docs/images/find_sec_groups_id.png)
+
+После запуска скрипта оследовательно для каждой вм будет такой вывод:
 
 ```shell
 Processing migration for server: yaklass-private-0
