@@ -1,5 +1,7 @@
 # Набор скриптов и инструкций для миграции виртуальных машин в SDN Sprut.
 
+![](./docs/images/changing_ports_simplified.png)
+
 Миграция с neutron на sprut процесс, требующий дополнительные действия с точки зрения сетевой инфраструктуры, здесь они описаны.
 
 О том что такое SDN, какие функциональные и нефункциональные премимущества между Neutron и Sprut смотрите [полное руководство](docs/complete_guide_to_migrating_to_SDN_SPRUT.md).
@@ -21,7 +23,7 @@
 ![](./docs/images/check_sprut_2.png)
 ![](./docs/images/check_sprut_3.png)
 
-Если SDN Sprut отсутсвует, то нужно oтправить в техподдержку запрос на добавление сети sprut в проект в облаке. В обращении необходимо указать айди проекта/проектов куда нужно добавить сеть sprut. [Контакты техподдержки](https://cloud.vk.com/docs/ru/intro/start/support/support-info).
+Если SDN Sprut отсутствует, то нужно oтправить в техподдержку запрос на добавление сети sprut в проект в облаке. В обращении необходимо указать айди проекта/проектов куда нужно добавить сеть sprut. [Контакты техподдержки](https://cloud.vk.com/docs/ru/intro/start/support/support-info).
 
 2. Подготовить рабочее место администратора (ВМ с ОС Linux) с установленными компонентами OpenStack CLI (nova, neutron, octavia), файл конфигурации отправлен в source [инструкция по установке](https://cloud.vk.com/docs/tools-for-using-services/cli/openstack-cli). Можно проверить работу через команду 
 ```bash
