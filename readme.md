@@ -10,6 +10,10 @@
 
 Для того, чтобы опробовать скрипты для миграции на тестовых стендах, можно воспользоваться примерами в папке [examples](examples/). Все стенды поднимаются через terraform. Подробнее про [установку](https://cloud.vk.com/docs/ru/tools-for-using-services/terraform/quick-start).
 
+В папке [presentations](presentations/) содержатся презентации с описанием sprut, миграции, целях и преимуществах.
+- [Полная версия](presentations/Миграция%20на%20SDN%20Sprut.%20Full.pdf) с техническими подробностями
+- [Короткая версия](presentations/Миграция%20на%20SDN%20Sprut.%20Short.pdf)
+
 ## Базовый кейс миграции проекта на IaaS
 
 Схема последовательности действий при миграции. Схема для миграции кейса с PaaS доступна в [полном руководстве](docs/complete_guide_to_migrating_to_SDN_SPRUT.md).
