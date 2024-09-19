@@ -132,7 +132,7 @@ sudo apt install nginx
 Запускаем скрипт:
 
 ```bash
-./../../../migrator-multiple.sh migrator-multiple-input.csv
+./../../../migrator-multiple.sh migrator-multiple-input.csv --all-secgroup-sprut-id 8492ee54-a0a6-4dd1-a8af-0c73d4b5edf5
 ```
 
 ![alt text](../../docs/images/webinar-stage-4.png)
