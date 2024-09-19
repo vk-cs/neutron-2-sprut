@@ -80,6 +80,12 @@ neutron router id,adv
 
 ## Копирование ipsec
 
+
+конфиг
+```bash
+id стандартного роутера, id продвинутого 
+```
+
 ```bash
 ./../../../copy-ipsec-v2.sh copy-ipsec-input.csv
 ```
